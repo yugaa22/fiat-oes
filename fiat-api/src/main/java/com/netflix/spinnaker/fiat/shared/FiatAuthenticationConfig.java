@@ -27,6 +27,7 @@ import com.netflix.spinnaker.config.okhttp3.OkHttpClientProvider;
 import com.netflix.spinnaker.kork.web.exceptions.ExceptionMessageDecorator;
 import com.netflix.spinnaker.okhttp.SpinnakerRequestInterceptor;
 import com.netflix.spinnaker.retrofit.Slf4jRetrofitLogger;
+import jakarta.servlet.Filter;
 import lombok.Setter;
 import lombok.val;
 import okhttp3.OkHttpClient;
@@ -42,7 +43,7 @@ import org.springframework.core.annotation.Order;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
 import org.springframework.security.web.authentication.AuthenticationConverter;
 import retrofit.Endpoints;
@@ -123,19 +124,18 @@ public class FiatAuthenticationConfig {
     return new FiatAccessDeniedExceptionHandler(exceptionMessageDecorator);
   }
 
-  private static class FiatWebSecurityConfigurerAdapter extends WebSecurityConfigurerAdapter {
+  private static class FiatWebSecurityConfigurerAdapter {
     private final FiatStatus fiatStatus;
     private final AuthenticationConverter authenticationConverter;
 
     private FiatWebSecurityConfigurerAdapter(
         FiatStatus fiatStatus, AuthenticationConverter authenticationConverter) {
-      super(true);
       this.fiatStatus = fiatStatus;
       this.authenticationConverter = authenticationConverter;
     }
 
-    @Override
-    protected void configure(HttpSecurity http) throws Exception {
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
       http.servletApi()
           .and()
           .exceptionHandling()
@@ -143,8 +143,9 @@ public class FiatAuthenticationConfig {
           .anonymous()
           .and()
           .addFilterBefore(
-              new FiatAuthenticationFilter(fiatStatus, authenticationConverter),
+              (Filter) new FiatAuthenticationFilter(fiatStatus, authenticationConverter),
               AnonymousAuthenticationFilter.class);
+      return http.build();
     }
   }
 }
